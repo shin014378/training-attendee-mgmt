@@ -1,6 +1,7 @@
 "use client";
 
 import type { Course } from "@/lib/training-schema";
+import { InlineTextField } from "@/components/primitives/InlineTextField";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -10,6 +11,11 @@ type CourseInfoPaneProps = {
   parentOnlySelected?: boolean;
   selectedAttendeeId: string | null;
   onSelectAttendee: (attendeeId: string) => void;
+  onUpdateCourse: (
+    courseId: string,
+    field: "date" | "location",
+    value: string,
+  ) => void;
 };
 
 export function CourseInfoPane({
@@ -18,6 +24,7 @@ export function CourseInfoPane({
   parentOnlySelected = false,
   selectedAttendeeId,
   onSelectAttendee,
+  onUpdateCourse,
 }: CourseInfoPaneProps) {
   if (parentOnlySelected && trainingName) {
     return (
@@ -42,16 +49,34 @@ export function CourseInfoPane({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <header className="flex h-12 shrink-0 flex-wrap items-center gap-x-6 gap-y-1 border-b border-border px-4">
+      <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-border px-4 py-2">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        <dl className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+        <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <dt className="font-medium text-foreground">日時</dt>
-            <dd>{course.date}</dd>
+            <dt className="shrink-0 font-medium text-foreground">日時</dt>
+            <dd className="min-w-0">
+              <InlineTextField
+                key={`${course.id}-date`}
+                value={course.date}
+                onSave={(v) => onUpdateCourse(course.id, "date", v)}
+                ariaLabel="日時"
+                placeholder="未設定"
+                className="w-36"
+              />
+            </dd>
           </div>
           <div className="flex items-center gap-2">
-            <dt className="font-medium text-foreground">場所</dt>
-            <dd>{course.location}</dd>
+            <dt className="shrink-0 font-medium text-foreground">場所</dt>
+            <dd className="min-w-0">
+              <InlineTextField
+                key={`${course.id}-location`}
+                value={course.location}
+                onSave={(v) => onUpdateCourse(course.id, "location", v)}
+                ariaLabel="場所"
+                placeholder="未設定"
+                className="w-36"
+              />
+            </dd>
           </div>
         </dl>
       </header>

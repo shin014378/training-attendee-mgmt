@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "deploy:surge": "npm run build && npx surge out training-attendee-mgmt.surge.sh",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",

@@ -85,29 +85,30 @@ export function TrainingWorkspace() {
     setSelectedAttendeeId(attendeeId);
   }, []);
 
-  const addItem = useCallback(
-    (name: string) => {
-      if (selection.kind === "none") {
-        const trainingId = `t-${Date.now()}`;
-        const courseId = `c-${Date.now()}`;
-        const newTraining: Training = {
-          id: trainingId,
+  const addParentTraining = useCallback((name: string) => {
+    const trainingId = `t-${Date.now()}`;
+    const courseId = `c-${Date.now()}`;
+    const newTraining: Training = {
+      id: trainingId,
+      name,
+      courses: [
+        {
+          id: courseId,
           name,
-          courses: [
-            {
-              id: courseId,
-              name,
-              date: "未設定",
-              location: "未設定",
-              attendees: [],
-            },
-          ],
-        };
-        setTrainings((prev) => [...prev, newTraining]);
-        setSelection({ kind: "training", trainingId });
-        setSelectedAttendeeId(null);
-        return;
-      }
+          date: "未設定",
+          location: "未設定",
+          attendees: [],
+        },
+      ],
+    };
+    setTrainings((prev) => [...prev, newTraining]);
+    setSelection({ kind: "training", trainingId });
+    setSelectedAttendeeId(null);
+  }, []);
+
+  const addChildCourse = useCallback(
+    (name: string) => {
+      if (selection.kind === "none") return;
 
       const trainingId = selection.trainingId;
       const courseId = `c-${Date.now()}`;
@@ -196,6 +197,20 @@ export function TrainingWorkspace() {
     [],
   );
 
+  const updateCourseField = useCallback(
+    (courseId: string, field: "date" | "location", value: string) => {
+      setTrainings((prev) =>
+        prev.map((t) => ({
+          ...t,
+          courses: t.courses.map((c) =>
+            c.id === courseId ? { ...c, [field]: value } : c,
+          ),
+        })),
+      );
+    },
+    [],
+  );
+
   const removeAttendee = useCallback(() => {
     if (!selectedAttendeeId || !selectedCourseId) return;
     setTrainings((prev) =>
@@ -257,13 +272,14 @@ export function TrainingWorkspace() {
         selection={selection}
         onSelectTraining={selectTraining}
         onSelectCourse={selectCourse}
-        onAddItem={addItem}
+        onAddParent={addParentTraining}
+        onAddChild={addChildCourse}
         onDeleteSelected={deleteSelected}
       />
       <SidebarInset className="flex min-w-0 flex-col bg-background">
         <header className="flex h-12 shrink-0 items-center border-b border-border bg-background px-4">
           <h1 className="text-sm font-semibold text-foreground">
-            研修受講者管理
+            研修ワーク管理スペース
           </h1>
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
@@ -277,6 +293,7 @@ export function TrainingWorkspace() {
             }
             selectedAttendeeId={selectedAttendeeId}
             onSelectAttendee={selectAttendee}
+            onUpdateCourse={updateCourseField}
           />
           <div className="flex h-72 shrink-0 border-t border-border">
             <AttendeeDetailPane

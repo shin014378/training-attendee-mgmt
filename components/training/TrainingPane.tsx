@@ -22,7 +22,8 @@ type TrainingPaneProps = {
   selection: TrainingSelection;
   onSelectTraining: (trainingId: string) => void;
   onSelectCourse: (trainingId: string, courseId: string) => void;
-  onAddItem: (name: string) => void;
+  onAddParent: (name: string) => void;
+  onAddChild: (name: string) => void;
   onDeleteSelected: () => void;
 };
 
@@ -47,18 +48,26 @@ export function TrainingPane({
   selection,
   onSelectTraining,
   onSelectCourse,
-  onAddItem,
+  onAddParent,
+  onAddChild,
   onDeleteSelected,
 }: TrainingPaneProps) {
   const [newName, setNewName] = useState("");
 
-  const addPlaceholder =
-    selection.kind === "none" ? "研修名" : "コース名";
+  const canAddChild = selection.kind !== "none";
+  const hasName = newName.trim().length > 0;
 
-  const handleAdd = () => {
+  const handleAddParent = () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    onAddItem(trimmed);
+    onAddParent(trimmed);
+    setNewName("");
+  };
+
+  const handleAddChild = () => {
+    const trimmed = newName.trim();
+    if (!trimmed || !canAddChild) return;
+    onAddChild(trimmed);
     setNewName("");
   };
 
@@ -139,18 +148,29 @@ export function TrainingPane({
 
       <SidebarFooter className="mt-auto border-t border-sidebar-border p-3">
         <div className="flex flex-col gap-2">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="名前"
+            aria-label="追加する名前"
+          />
           <div className="flex gap-2">
-            <Input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={addPlaceholder}
-              aria-label={addPlaceholder}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd();
-              }}
-            />
-            <Button type="button" onClick={handleAdd} disabled={!newName.trim()}>
-              追加
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={handleAddParent}
+              disabled={!hasName}
+            >
+              親を追加
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              variant="secondary"
+              onClick={handleAddChild}
+              disabled={!hasName || !canAddChild}
+            >
+              子を追加
             </Button>
           </div>
           <Button
