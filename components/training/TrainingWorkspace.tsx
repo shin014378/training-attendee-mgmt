@@ -229,38 +229,48 @@ export function TrainingWorkspace() {
     setSelectedAttendeeId(null);
   }, [selectedAttendeeId, selectedCourseId]);
 
-  const updateAttendeeEmployeeNumber = useCallback(
-    (newNumber: string): boolean => {
-      if (!selectedAttendeeId || !selectedCourseId) return false;
-      const emp = findEmployee(newNumber);
-      if (!emp) return false;
-      setTrainings((prev) =>
-        prev.map((t) => ({
+  const moveAttendeeToCourse = useCallback(
+    (attendeeId: string, fromCourseId: string, toCourseId: string) => {
+      if (fromCourseId === toCourseId) return;
+
+      const trainingId = trainings.find((t) =>
+        t.courses.some((c) => c.id === toCourseId),
+      )?.id;
+      if (!trainingId) return;
+
+      setTrainings((prev) => {
+        let moved: Attendee | null = null;
+        const withoutAttendee = prev.map((t) => ({
+          ...t,
+          courses: t.courses.map((c) => {
+            if (c.id !== fromCourseId) return c;
+            const found = c.attendees.find((a) => a.id === attendeeId);
+            if (found) moved = found;
+            return {
+              ...c,
+              attendees: c.attendees.filter((a) => a.id !== attendeeId),
+            };
+          }),
+        }));
+        if (!moved) return prev;
+        const attendee = moved;
+        return withoutAttendee.map((t) => ({
           ...t,
           courses: t.courses.map((c) =>
-            c.id === selectedCourseId
-              ? {
-                  ...c,
-                  attendees: c.attendees.map((a) =>
-                    a.id === selectedAttendeeId
-                      ? {
-                          ...a,
-                          employeeNumber: emp.employeeNumber,
-                          name: emp.name,
-                          department: emp.department,
-                          departmentCode: emp.departmentCode,
-                        }
-                      : a,
-                  ),
-                }
+            c.id === toCourseId
+              ? { ...c, attendees: [...c.attendees, attendee] }
               : c,
           ),
-        })),
-      );
-      return true;
+        }));
+      });
+
+      setSelection({ kind: "course", trainingId, courseId: toCourseId });
     },
-    [selectedAttendeeId, selectedCourseId],
+    [trainings],
   );
+
+  const siblingCourses = selectedContext?.training.courses ?? [];
+  const activeCourseId = selectedContext?.course.id ?? null;
 
   return (
     <SidebarProvider
@@ -297,15 +307,18 @@ export function TrainingWorkspace() {
           />
           <div className="flex h-72 shrink-0 border-t border-border">
             <AttendeeDetailPane
-              key={`${selectedCourseId ?? "none"}-${selectedAttendeeId ?? "none"}`}
+              key={`${activeCourseId ?? "none"}-${selectedAttendeeId ?? "none"}`}
               attendee={selectedAttendee}
+              currentCourseId={activeCourseId}
+              siblingCourses={siblingCourses}
               onAdd={(code) =>
-                selectedCourseId
-                  ? addAttendee(selectedCourseId, code)
-                  : false
+                activeCourseId ? addAttendee(activeCourseId, code) : false
               }
               onRemove={removeAttendee}
-              onChangeEmployeeNumber={updateAttendeeEmployeeNumber}
+              onMoveToCourse={(attendeeId, toCourseId) => {
+                if (!activeCourseId) return;
+                moveAttendeeToCourse(attendeeId, activeCourseId, toCourseId);
+              }}
             />
             <ReferenceFilePane
               fileName={referenceFileName}

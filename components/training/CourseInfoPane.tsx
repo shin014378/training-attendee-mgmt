@@ -4,6 +4,7 @@ import type { Course } from "@/lib/training-schema";
 import { InlineTextField } from "@/components/primitives/InlineTextField";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { trainingScrollAreaClass } from "@/components/training/training-scroll-area";
 
 type CourseInfoPaneProps = {
   trainingName: string | null;
@@ -88,7 +89,7 @@ export function CourseInfoPane({
         <span>所属</span>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea className={trainingScrollAreaClass}>
         {course.attendees.length === 0 ? (
           <p className="flex h-16 items-center justify-center text-sm text-muted-foreground">
             受講者がいません

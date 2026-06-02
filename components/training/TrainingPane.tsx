@@ -5,9 +5,9 @@ import { useState } from "react";
 import type { Training, TrainingSelection } from "@/lib/training-schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sidebar,
-  SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
@@ -16,6 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { trainingScrollAreaClass } from "@/components/training/training-scroll-area";
 
 type TrainingPaneProps = {
   trainings: Training[];
@@ -74,7 +75,7 @@ export function TrainingPane({
   return (
     <Sidebar
       collapsible="none"
-      className="shrink-0 border-r border-sidebar-border bg-sidebar"
+      className="h-full min-h-0 shrink-0 border-r border-sidebar-border bg-sidebar"
     >
       <SidebarHeader className="border-b border-sidebar-border p-0">
         <div className="flex h-12 items-center px-5">
@@ -84,7 +85,8 @@ export function TrainingPane({
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-1 py-3">
+      <ScrollArea className={trainingScrollAreaClass}>
+        <div className="flex flex-col gap-2 px-1 py-3">
         {trainings.map((training) => {
           const isFlat = training.courses.length === 1;
           const trainingActive = isTrainingActive(selection, training.id);
@@ -144,7 +146,8 @@ export function TrainingPane({
             </SidebarGroup>
           );
         })}
-      </SidebarContent>
+        </div>
+      </ScrollArea>
 
       <SidebarFooter className="mt-auto border-t border-sidebar-border p-3">
         <div className="flex flex-col gap-2">
