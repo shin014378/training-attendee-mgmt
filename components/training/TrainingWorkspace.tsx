@@ -18,6 +18,7 @@ import { TrainingPane } from "@/components/training/TrainingPane";
 import { CourseInfoPane } from "@/components/training/CourseInfoPane";
 import { AttendeeDetailPane } from "@/components/training/AttendeeDetailPane";
 import { ReferenceFilePane } from "@/components/training/ReferenceFilePane";
+import { trainingBottomBandClass } from "@/components/training/training-layout";
 
 function pickFallbackSelection(
   trainings: Training[],
@@ -423,7 +424,8 @@ export function TrainingWorkspace() {
   return (
     <SidebarProvider
       defaultOpen
-      className="flex h-screen w-full overflow-hidden bg-background text-foreground"
+      data-training-workspace
+      className="flex h-screen w-full overflow-hidden bg-background text-foreground text-sm"
     >
       <TrainingPane
         trainings={trainings}
@@ -435,12 +437,12 @@ export function TrainingWorkspace() {
         onDeleteSelected={deleteSelected}
       />
       <SidebarInset className="flex min-w-0 flex-col bg-background">
-        <header className="flex h-12 shrink-0 items-center border-b border-border bg-background px-4">
-          <h1 className="text-sm font-semibold text-foreground">
+        <header className="flex h-10 shrink-0 items-center border-b border-border bg-card px-3">
+          <h1 className="text-xs font-semibold text-foreground">
             研修ワーク管理スペース
           </h1>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col bg-card">
           <CourseInfoPane
             trainingName={paneTrainingName}
             course={selectedContext?.course ?? null}
@@ -449,7 +451,7 @@ export function TrainingWorkspace() {
             onSelectAttendee={selectAttendee}
             onUpdateCourse={updateCourseField}
           />
-          <div className="flex h-72 shrink-0 border-t border-border">
+          <div className={trainingBottomBandClass}>
             <AttendeeDetailPane
               key={`${activeCourseId ?? "none"}-${selectedAttendeeId ?? "none"}`}
               attendee={selectedAttendee}

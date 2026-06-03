@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-import type { Attendee, Course, AddAttendeeResult, MoveAttendeeResult } from "@/lib/training-schema";
+import type {
+  Attendee,
+  Course,
+  AddAttendeeResult,
+  MoveAttendeeResult,
+} from "@/lib/training-schema";
 import { findEmployee } from "@/lib/data/employee-mock";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -14,12 +19,13 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { SectionLabel } from "@/components/primitives";
+import {
+  trainingFieldInputClass,
+  trainingFieldLabelClass,
+  trainingPaneHeaderClass,
+  trainingReadOnlyInputClass,
+} from "@/components/training/training-layout";
 import { cn } from "@/lib/utils";
-
-const compactInputClass = "h-7 min-w-0 w-full text-xs";
-const compactLabelClass = "text-xs";
-const readOnlyInputClass =
-  "h-7 min-w-0 w-full cursor-default text-xs bg-muted/40 tabular-nums";
 
 type AttendeeDetailPaneProps = {
   attendee: Attendee | null;
@@ -129,15 +135,15 @@ export function AttendeeDetailPane({
       aria-label="従業員検索"
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-border bg-card"
     >
-      <header className="flex h-8 shrink-0 items-center border-b border-border px-3">
-        <SectionLabel className="text-xs">従業員検索</SectionLabel>
+      <header className={trainingPaneHeaderClass}>
+        <SectionLabel size="compact">従業員検索</SectionLabel>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
         <Field className="min-w-0 gap-1">
           <FieldLabel
             htmlFor="attendee-search-code"
-            className={compactLabelClass}
+            className={trainingFieldLabelClass}
           >
             従業員コード
           </FieldLabel>
@@ -152,7 +158,7 @@ export function AttendeeDetailPane({
               placeholder="従業員コードの入力"
               aria-invalid={searchError.length > 0}
               aria-describedby="attendee-search-error"
-              className={cn(compactInputClass, "flex-1")}
+              className={cn(trainingFieldInputClass, "flex-1")}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSearch();
               }}
@@ -180,7 +186,10 @@ export function AttendeeDetailPane({
 
         <div className="grid min-w-0 grid-cols-2 gap-2">
           <Field className="min-w-0 gap-1">
-            <FieldLabel htmlFor="attendee-name" className={compactLabelClass}>
+            <FieldLabel
+              htmlFor="attendee-name"
+              className={trainingFieldLabelClass}
+            >
               氏名
             </FieldLabel>
             <Input
@@ -189,13 +198,13 @@ export function AttendeeDetailPane({
               tabIndex={-1}
               value={display?.name ?? ""}
               placeholder="—"
-              className={readOnlyInputClass}
+              className={trainingReadOnlyInputClass}
             />
           </Field>
           <Field className="min-w-0 gap-1">
             <FieldLabel
               htmlFor="attendee-dept-code"
-              className={compactLabelClass}
+              className={trainingFieldLabelClass}
             >
               所属コード
             </FieldLabel>
@@ -205,13 +214,13 @@ export function AttendeeDetailPane({
               tabIndex={-1}
               value={display?.departmentCode ?? ""}
               placeholder="—"
-              className={cn(readOnlyInputClass, "font-mono")}
+              className={cn(trainingReadOnlyInputClass, "font-mono")}
             />
           </Field>
         </div>
 
         <Field className="min-w-0 gap-1">
-          <FieldLabel htmlFor="attendee-dept" className={compactLabelClass}>
+          <FieldLabel htmlFor="attendee-dept" className={trainingFieldLabelClass}>
             所属
           </FieldLabel>
           <Input
@@ -220,13 +229,16 @@ export function AttendeeDetailPane({
             tabIndex={-1}
             value={display?.department ?? ""}
             placeholder="—"
-            className={readOnlyInputClass}
+            className={trainingReadOnlyInputClass}
           />
         </Field>
 
         <div className="flex min-w-0 flex-wrap items-end gap-2">
           <Field className="min-w-[8rem] flex-1 gap-1">
-            <FieldLabel htmlFor="attendee-course" className={compactLabelClass}>
+            <FieldLabel
+              htmlFor="attendee-course"
+              className={trainingFieldLabelClass}
+            >
               受講コース
             </FieldLabel>
             <Select
@@ -242,7 +254,7 @@ export function AttendeeDetailPane({
                 aria-label="受講コース"
                 className="h-7 w-full min-w-0"
               >
-                <span className="truncate">{courseTriggerLabel}</span>
+                <span className="truncate text-xs">{courseTriggerLabel}</span>
               </SelectTrigger>
               <SelectContent align="start">
                 {siblingCourses.map((course) => (

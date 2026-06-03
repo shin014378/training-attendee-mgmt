@@ -213,10 +213,12 @@ export function TrainingPane({
             onChange={(e) => setNewName(e.target.value)}
             placeholder="名前"
             aria-label="追加する名前"
+            className="h-7 text-xs"
           />
           <div className="flex gap-2">
             <Button
               type="button"
+              size="sm"
               className="flex-1"
               onClick={handleAddParent}
               disabled={!hasName}
@@ -225,6 +227,7 @@ export function TrainingPane({
             </Button>
             <Button
               type="button"
+              size="sm"
               className="flex-1"
               variant="secondary"
               onClick={handleAddChild}
@@ -240,6 +243,7 @@ export function TrainingPane({
           </div>
           <Button
             type="button"
+            size="sm"
             variant="destructive"
             onClick={() => setDeleteOpen(true)}
             disabled={selection.kind === "none"}
