@@ -21,7 +21,7 @@ export function ReferenceFilePane({
 
   return (
     <section className="flex w-36 shrink-0 flex-col bg-background">
-      <header className="flex h-10 shrink-0 items-center border-b border-border px-4">
+      <header className="flex h-8 shrink-0 items-center border-b border-border px-4">
         <SectionLabel>参照にするファイル</SectionLabel>
       </header>
 

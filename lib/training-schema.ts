@@ -30,6 +30,28 @@ export type TrainingSelection =
   | { kind: "training"; trainingId: string }
   | { kind: "course"; trainingId: string; courseId: string };
 
+export type AddAttendeeResult = "ok" | "not_found" | "duplicate";
+
+export type MoveAttendeeResult = "ok" | "duplicate" | "failed";
+
+/** 子なし表示（コース1件・名前が親と同一）の研修 */
+export function isFlatTraining(training: Training): boolean {
+  return (
+    training.courses.length === 1 && training.courses[0].name === training.name
+  );
+}
+
+export function selectionForTraining(training: Training): TrainingSelection {
+  if (isFlatTraining(training)) {
+    return { kind: "training", trainingId: training.id };
+  }
+  const first = training.courses[0];
+  if (first) {
+    return { kind: "course", trainingId: training.id, courseId: first.id };
+  }
+  return { kind: "none" };
+}
+
 export const employeeSchema = z.object({
   employeeNumber: z.string(),
   name: z.string(),

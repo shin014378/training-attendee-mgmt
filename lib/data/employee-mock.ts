@@ -14,5 +14,8 @@ export const EMPLOYEE_MASTER: readonly Employee[] = [
 ];
 
 export function findEmployee(employeeNumber: string): Employee | null {
-  return EMPLOYEE_MASTER.find((e) => e.employeeNumber === employeeNumber) ?? null;
+  const normalized = employeeNumber.trim().toUpperCase();
+  return (
+    EMPLOYEE_MASTER.find((e) => e.employeeNumber === normalized) ?? null
+  );
 }

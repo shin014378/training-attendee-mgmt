@@ -2,7 +2,15 @@
 
 import { useState, useCallback } from "react";
 
-import type { Attendee, Training, TrainingSelection } from "@/lib/training-schema";
+import {
+  isFlatTraining,
+  selectionForTraining,
+  type AddAttendeeResult,
+  type Attendee,
+  type MoveAttendeeResult,
+  type Training,
+  type TrainingSelection,
+} from "@/lib/training-schema";
 import { INITIAL_TRAININGS } from "@/lib/data/training-mock";
 import { findEmployee } from "@/lib/data/employee-mock";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -11,17 +19,34 @@ import { CourseInfoPane } from "@/components/training/CourseInfoPane";
 import { AttendeeDetailPane } from "@/components/training/AttendeeDetailPane";
 import { ReferenceFilePane } from "@/components/training/ReferenceFilePane";
 
-function pickFallbackSelection(trainings: Training[]): TrainingSelection {
-  const first = trainings[0];
-  if (!first) return { kind: "none" };
-  if (first.courses.length === 1) {
-    return { kind: "training", trainingId: first.id };
+function pickFallbackSelection(
+  trainings: Training[],
+  deleted?: TrainingSelection,
+): TrainingSelection {
+  if (trainings.length === 0) return { kind: "none" };
+
+  if (deleted?.kind === "course") {
+    const training = trainings.find((t) => t.id === deleted.trainingId);
+    if (training && training.courses.length > 0) {
+      const remaining = training.courses.filter((c) => c.id !== deleted.courseId);
+      if (remaining.length > 0) {
+        return selectionForTraining({ ...training, courses: remaining });
+      }
+    }
+    const idx = trainings.findIndex((t) => t.id === deleted.trainingId);
+    const fallbackTraining =
+      trainings[idx] ?? trainings[Math.max(0, idx - 1)] ?? trainings[0];
+    if (fallbackTraining) return selectionForTraining(fallbackTraining);
   }
-  return {
-    kind: "course",
-    trainingId: first.id,
-    courseId: first.courses[0].id,
-  };
+
+  if (deleted?.kind === "training") {
+    const idx = trainings.findIndex((t) => t.id === deleted.trainingId);
+    const fallbackTraining =
+      trainings[idx] ?? trainings[idx - 1] ?? trainings[0];
+    if (fallbackTraining) return selectionForTraining(fallbackTraining);
+  }
+
+  return selectionForTraining(trainings[0]!);
 }
 
 function resolveActiveCourse(
@@ -38,13 +63,116 @@ function resolveActiveCourse(
   if (selection.kind === "training") {
     const training = trainings.find((t) => t.id === selection.trainingId);
     if (!training) return null;
-    if (training.courses.length === 1) {
+    if (isFlatTraining(training)) {
       return { training, course: training.courses[0] };
     }
     return null;
   }
 
   return null;
+}
+
+function applyAddChildCourse(
+  trainings: Training[],
+  trainingId: string,
+  name: string,
+): { trainings: Training[]; selection: TrainingSelection } | null {
+  const training = trainings.find((t) => t.id === trainingId);
+  if (!training) return null;
+
+  if (isFlatTraining(training)) {
+    const existingCourseId = training.courses[0].id;
+    const updatedTraining: Training = {
+      ...training,
+      courses: [{ ...training.courses[0], name }],
+    };
+    return {
+      trainings: trainings.map((t) =>
+        t.id === trainingId ? updatedTraining : t,
+      ),
+      selection: isFlatTraining(updatedTraining)
+        ? { kind: "training", trainingId }
+        : { kind: "course", trainingId, courseId: existingCourseId },
+    };
+  }
+
+  const courseId = crypto.randomUUID();
+  return {
+    trainings: trainings.map((t) =>
+      t.id === trainingId
+        ? {
+            ...t,
+            courses: [
+              ...t.courses,
+              {
+                id: courseId,
+                name,
+                date: "未設定",
+                location: "未設定",
+                attendees: [],
+              },
+            ],
+          }
+        : t,
+    ),
+    selection: { kind: "course", trainingId, courseId },
+  };
+}
+
+function applyMoveAttendee(
+  trainings: Training[],
+  attendeeId: string,
+  fromCourseId: string,
+  toCourseId: string,
+): { trainings: Training[]; selection: TrainingSelection } | "duplicate" | null {
+  if (fromCourseId === toCourseId) return null;
+
+  const training = trainings.find((t) =>
+    t.courses.some((c) => c.id === toCourseId),
+  );
+  if (!training) return null;
+
+  let moved: Attendee | null = null;
+  const withoutAttendee = trainings.map((t) => ({
+    ...t,
+    courses: t.courses.map((c) => {
+      if (c.id !== fromCourseId) return c;
+      const found = c.attendees.find((a) => a.id === attendeeId);
+      if (found) moved = found;
+      return {
+        ...c,
+        attendees: c.attendees.filter((a) => a.id !== attendeeId),
+      };
+    }),
+  }));
+
+  if (!moved) return null;
+
+  const targetCourse = training.courses.find((c) => c.id === toCourseId);
+  if (
+    targetCourse?.attendees.some(
+      (a) => a.employeeNumber === moved!.employeeNumber,
+    )
+  ) {
+    return "duplicate";
+  }
+
+  const attendee = moved;
+  return {
+    trainings: withoutAttendee.map((t) => ({
+      ...t,
+      courses: t.courses.map((c) =>
+        c.id === toCourseId
+          ? { ...c, attendees: [...c.attendees, attendee] }
+          : c,
+      ),
+    })),
+    selection: {
+      kind: "course",
+      trainingId: training.id,
+      courseId: toCourseId,
+    },
+  };
 }
 
 export function TrainingWorkspace() {
@@ -61,8 +189,13 @@ export function TrainingWorkspace() {
 
   const selectedContext = resolveActiveCourse(trainings, selection);
 
-  const selectedCourseId =
-    selection.kind === "course" ? selection.courseId : null;
+  const selectedTraining =
+    selection.kind !== "none"
+      ? (trainings.find((t) => t.id === selection.trainingId) ?? null)
+      : null;
+
+  const paneTrainingName =
+    selectedContext?.training.name ?? selectedTraining?.name ?? null;
 
   const selectedAttendee =
     selectedAttendeeId && selectedContext
@@ -86,8 +219,8 @@ export function TrainingWorkspace() {
   }, []);
 
   const addParentTraining = useCallback((name: string) => {
-    const trainingId = `t-${Date.now()}`;
-    const courseId = `c-${Date.now()}`;
+    const trainingId = crypto.randomUUID();
+    const courseId = crypto.randomUUID();
     const newTraining: Training = {
       id: trainingId,
       name,
@@ -111,29 +244,19 @@ export function TrainingWorkspace() {
       if (selection.kind === "none") return;
 
       const trainingId = selection.trainingId;
-      const courseId = `c-${Date.now()}`;
+      let nextSelection: TrainingSelection | null = null;
 
-      setTrainings((prev) =>
-        prev.map((t) =>
-          t.id === trainingId
-            ? {
-                ...t,
-                courses: [
-                  ...t.courses,
-                  {
-                    id: courseId,
-                    name,
-                    date: "未設定",
-                    location: "未設定",
-                    attendees: [],
-                  },
-                ],
-              }
-            : t,
-        ),
-      );
-      setSelection({ kind: "course", trainingId, courseId });
-      setSelectedAttendeeId(null);
+      setTrainings((prev) => {
+        const result = applyAddChildCourse(prev, trainingId, name);
+        if (!result) return prev;
+        nextSelection = result.selection;
+        return result.trainings;
+      });
+
+      if (nextSelection) {
+        setSelection(nextSelection);
+        setSelectedAttendeeId(null);
+      }
     },
     [selection],
   );
@@ -142,57 +265,76 @@ export function TrainingWorkspace() {
     if (selection.kind === "none") return;
 
     if (selection.kind === "training") {
-      setTrainings((prev) => {
-        const next = prev.filter((t) => t.id !== selection.trainingId);
-        setSelection(pickFallbackSelection(next));
-        setSelectedAttendeeId(null);
-        return next;
-      });
+      const next = trainings.filter((t) => t.id !== selection.trainingId);
+      setTrainings(next);
+      setSelection(pickFallbackSelection(next, selection));
+      setSelectedAttendeeId(null);
       return;
     }
 
     const { trainingId, courseId } = selection;
-    setTrainings((prev) => {
-      const next = prev
-        .map((training) => {
-          if (training.id !== trainingId) return training;
-          return {
-            ...training,
-            courses: training.courses.filter((c) => c.id !== courseId),
-          };
-        })
-        .filter((training) => training.courses.length > 0);
+    const next = trainings
+      .map((training) => {
+        if (training.id !== trainingId) return training;
+        return {
+          ...training,
+          courses: training.courses.filter((c) => c.id !== courseId),
+        };
+      })
+      .filter((training) => training.courses.length > 0);
 
-      setSelection(pickFallbackSelection(next));
-      setSelectedAttendeeId(null);
-      return next;
-    });
-  }, [selection]);
+    setTrainings(next);
+    setSelection(
+      pickFallbackSelection(next, {
+        kind: "course",
+        trainingId,
+        courseId,
+      }),
+    );
+    setSelectedAttendeeId(null);
+  }, [selection, trainings]);
 
   const addAttendee = useCallback(
-    (courseId: string, employeeNumber: string): boolean => {
+    (courseId: string, employeeNumber: string): AddAttendeeResult => {
       const emp = findEmployee(employeeNumber);
-      if (!emp) return false;
+      if (!emp) return "not_found";
 
+      let result: AddAttendeeResult = "ok";
       const newAttendee: Attendee = {
-        id: `a-${Date.now()}`,
+        id: crypto.randomUUID(),
         employeeNumber: emp.employeeNumber,
         name: emp.name,
         department: emp.department,
         departmentCode: emp.departmentCode,
       };
-      setTrainings((prev) =>
-        prev.map((t) => ({
+
+      setTrainings((prev) => {
+        const targetCourse = prev
+          .flatMap((t) => t.courses)
+          .find((c) => c.id === courseId);
+        if (
+          targetCourse?.attendees.some(
+            (a) => a.employeeNumber === emp.employeeNumber,
+          )
+        ) {
+          result = "duplicate";
+          return prev;
+        }
+
+        return prev.map((t) => ({
           ...t,
           courses: t.courses.map((c) =>
             c.id === courseId
               ? { ...c, attendees: [...c.attendees, newAttendee] }
               : c,
           ),
-        })),
-      );
-      setSelectedAttendeeId(newAttendee.id);
-      return true;
+        }));
+      });
+
+      if (result === "ok") {
+        setSelectedAttendeeId(newAttendee.id);
+      }
+      return result;
     },
     [],
   );
@@ -212,65 +354,71 @@ export function TrainingWorkspace() {
   );
 
   const removeAttendee = useCallback(() => {
-    if (!selectedAttendeeId || !selectedCourseId) return;
-    setTrainings((prev) =>
-      prev.map((t) => ({
+    if (!selectedAttendeeId) return;
+
+    setTrainings((prev) => {
+      const ctx = resolveActiveCourse(prev, selection);
+      const courseId = ctx?.course.id;
+      if (!courseId) return prev;
+
+      return prev.map((t) => ({
         ...t,
         courses: t.courses.map((c) =>
-          c.id === selectedCourseId
+          c.id === courseId
             ? {
                 ...c,
-                attendees: c.attendees.filter((a) => a.id !== selectedAttendeeId),
+                attendees: c.attendees.filter(
+                  (a) => a.id !== selectedAttendeeId,
+                ),
               }
             : c,
         ),
-      })),
-    );
+      }));
+    });
     setSelectedAttendeeId(null);
-  }, [selectedAttendeeId, selectedCourseId]);
+  }, [selectedAttendeeId, selection]);
 
   const moveAttendeeToCourse = useCallback(
-    (attendeeId: string, fromCourseId: string, toCourseId: string) => {
-      if (fromCourseId === toCourseId) return;
-
-      const trainingId = trainings.find((t) =>
-        t.courses.some((c) => c.id === toCourseId),
-      )?.id;
-      if (!trainingId) return;
+    (
+      attendeeId: string,
+      fromCourseId: string,
+      toCourseId: string,
+    ): MoveAttendeeResult => {
+      let outcome: MoveAttendeeResult = "failed";
+      let nextSelection: TrainingSelection | null = null;
 
       setTrainings((prev) => {
-        let moved: Attendee | null = null;
-        const withoutAttendee = prev.map((t) => ({
-          ...t,
-          courses: t.courses.map((c) => {
-            if (c.id !== fromCourseId) return c;
-            const found = c.attendees.find((a) => a.id === attendeeId);
-            if (found) moved = found;
-            return {
-              ...c,
-              attendees: c.attendees.filter((a) => a.id !== attendeeId),
-            };
-          }),
-        }));
-        if (!moved) return prev;
-        const attendee = moved;
-        return withoutAttendee.map((t) => ({
-          ...t,
-          courses: t.courses.map((c) =>
-            c.id === toCourseId
-              ? { ...c, attendees: [...c.attendees, attendee] }
-              : c,
-          ),
-        }));
+        const result = applyMoveAttendee(
+          prev,
+          attendeeId,
+          fromCourseId,
+          toCourseId,
+        );
+        if (result === null) return prev;
+        if (result === "duplicate") {
+          outcome = "duplicate";
+          return prev;
+        }
+        outcome = "ok";
+        nextSelection = result.selection;
+        return result.trainings;
       });
 
-      setSelection({ kind: "course", trainingId, courseId: toCourseId });
+      if (nextSelection) {
+        setSelection(nextSelection);
+      }
+      return outcome;
     },
-    [trainings],
+    [],
   );
 
   const siblingCourses = selectedContext?.training.courses ?? [];
   const activeCourseId = selectedContext?.course.id ?? null;
+
+  const parentOnlySelected =
+    selection.kind === "training" &&
+    selectedTraining !== null &&
+    !isFlatTraining(selectedTraining);
 
   return (
     <SidebarProvider
@@ -294,13 +442,9 @@ export function TrainingWorkspace() {
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
           <CourseInfoPane
-            trainingName={selectedContext?.training.name ?? null}
+            trainingName={paneTrainingName}
             course={selectedContext?.course ?? null}
-            parentOnlySelected={
-              selection.kind === "training" &&
-              (trainings.find((t) => t.id === selection.trainingId)?.courses
-                .length ?? 0) > 1
-            }
+            parentOnlySelected={parentOnlySelected}
             selectedAttendeeId={selectedAttendeeId}
             onSelectAttendee={selectAttendee}
             onUpdateCourse={updateCourseField}
@@ -309,15 +453,20 @@ export function TrainingWorkspace() {
             <AttendeeDetailPane
               key={`${activeCourseId ?? "none"}-${selectedAttendeeId ?? "none"}`}
               attendee={selectedAttendee}
+              trainingName={paneTrainingName ?? ""}
               currentCourseId={activeCourseId}
               siblingCourses={siblingCourses}
               onAdd={(code) =>
-                activeCourseId ? addAttendee(activeCourseId, code) : false
+                activeCourseId ? addAttendee(activeCourseId, code) : "not_found"
               }
               onRemove={removeAttendee}
               onMoveToCourse={(attendeeId, toCourseId) => {
-                if (!activeCourseId) return;
-                moveAttendeeToCourse(attendeeId, activeCourseId, toCourseId);
+                if (!activeCourseId) return "failed";
+                return moveAttendeeToCourse(
+                  attendeeId,
+                  activeCourseId,
+                  toCourseId,
+                );
               }}
             />
             <ReferenceFilePane
