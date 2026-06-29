@@ -8,7 +8,8 @@ import path from "node:path";
 const projectRoot = path.resolve(__dirname);
 
 const nextConfig: NextConfig = {
-  output: "export",
+  // Surge 静的公開のみ output: "export"。Vercel + DB では STATIC_EXPORT=true を付けない
+  ...(process.env.STATIC_EXPORT === "true" ? { output: "export" as const } : {}),
   turbopack: {
     root: projectRoot,
   },

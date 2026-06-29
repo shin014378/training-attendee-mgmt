@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model Training {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  courses   Course[]
+
+  @@map("trainings")
+}
+
+model Course {
+  id          String             @id @default(uuid())
+  trainingId  String             @map("training_id")
+  name        String
+  date        String             @default("未設定")
+  location    String             @default("未設定")
+  sortOrder   Int                @default(0) @map("sort_order")
+  training    Training           @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  enrollments CourseEnrollment[]
+
+  @@map("courses")
+}
+
+model Employee {
+  employeeNumber String             @id @map("employee_number")
+  name           String
+  department     String
+  departmentCode String             @map("department_code")
+  enrollments    CourseEnrollment[]
+
+  @@map("employees")
+}
+
+model CourseEnrollment {
+  id             String   @id @default(uuid())
+  courseId       String   @map("course_id")
+  employeeNumber String   @map("employee_number")
+  enrolledAt     DateTime @default(now()) @map("enrolled_at")
+  course         Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee       Employee @relation(fields: [employeeNumber], references: [employeeNumber])
+
+  @@unique([courseId, employeeNumber])
+  @@map("course_enrollments")
+}
