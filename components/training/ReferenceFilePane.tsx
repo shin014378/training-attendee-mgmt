@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -19,8 +21,18 @@ export function ReferenceFilePane({
   fileName,
   onSelectFile,
 }: ReferenceFilePaneProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const handlePick = () => {
-    onSelectFile("employees.xlsx");
+    inputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onSelectFile(file.name);
+    }
+    event.target.value = "";
   };
 
   return (
@@ -30,7 +42,21 @@ export function ReferenceFilePane({
       </header>
 
       <div className="flex flex-col gap-2 p-3">
-        <Button type="button" size="sm" onClick={handlePick}>
+        <input
+          ref={inputRef}
+          id="reference-file-input"
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="sr-only"
+          tabIndex={-1}
+          onChange={handleFileChange}
+        />
+        <Button
+          type="button"
+          size="sm"
+          onClick={handlePick}
+          aria-controls="reference-file-input"
+        >
           ファイルを選ぶ
         </Button>
         <FieldGroup>

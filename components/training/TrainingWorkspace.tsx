@@ -100,7 +100,7 @@ export function TrainingWorkspace({
   const [selectedAttendeeId, setSelectedAttendeeId] = useState<string | null>(
     null,
   );
-  const [referenceFileName, setReferenceFileName] = useState("employees.xlsx");
+  const [referenceFileName, setReferenceFileName] = useState("");
 
   const refresh = useCallback(() => {
     startTransition(() => {
