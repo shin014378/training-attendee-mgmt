@@ -1,24 +1,39 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   isFlatTraining,
   selectionForTraining,
   type AddAttendeeResult,
-  type Attendee,
+  type Employee,
   type MoveAttendeeResult,
   type Training,
   type TrainingSelection,
 } from "@/lib/training-schema";
-import { INITIAL_TRAININGS } from "@/lib/data/training-mock";
-import { findEmployee } from "@/lib/data/employee-mock";
+import {
+  addChildCourseAction,
+  addEnrollmentAction,
+  createTrainingAction,
+  deleteCourseAction,
+  deleteTrainingAction,
+  moveEnrollmentAction,
+  removeEnrollmentAction,
+  updateCourseFieldAction,
+} from "@/lib/actions/training-actions";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TrainingPane } from "@/components/training/TrainingPane";
 import { CourseInfoPane } from "@/components/training/CourseInfoPane";
 import { AttendeeDetailPane } from "@/components/training/AttendeeDetailPane";
 import { ReferenceFilePane } from "@/components/training/ReferenceFilePane";
 import { trainingBottomBandClass } from "@/components/training/training-layout";
+
+type TrainingWorkspaceProps = {
+  trainings: Training[];
+  employees: Employee[];
+  initialSelection: TrainingSelection;
+};
 
 function pickFallbackSelection(
   trainings: Training[],
@@ -73,120 +88,25 @@ function resolveActiveCourse(
   return null;
 }
 
-function applyAddChildCourse(
-  trainings: Training[],
-  trainingId: string,
-  name: string,
-): { trainings: Training[]; selection: TrainingSelection } | null {
-  const training = trainings.find((t) => t.id === trainingId);
-  if (!training) return null;
-
-  if (isFlatTraining(training)) {
-    const existingCourseId = training.courses[0].id;
-    const updatedTraining: Training = {
-      ...training,
-      courses: [{ ...training.courses[0], name }],
-    };
-    return {
-      trainings: trainings.map((t) =>
-        t.id === trainingId ? updatedTraining : t,
-      ),
-      selection: isFlatTraining(updatedTraining)
-        ? { kind: "training", trainingId }
-        : { kind: "course", trainingId, courseId: existingCourseId },
-    };
-  }
-
-  const courseId = crypto.randomUUID();
-  return {
-    trainings: trainings.map((t) =>
-      t.id === trainingId
-        ? {
-            ...t,
-            courses: [
-              ...t.courses,
-              {
-                id: courseId,
-                name,
-                date: "未設定",
-                location: "未設定",
-                attendees: [],
-              },
-            ],
-          }
-        : t,
-    ),
-    selection: { kind: "course", trainingId, courseId },
-  };
-}
-
-function applyMoveAttendee(
-  trainings: Training[],
-  attendeeId: string,
-  fromCourseId: string,
-  toCourseId: string,
-): { trainings: Training[]; selection: TrainingSelection } | "duplicate" | null {
-  if (fromCourseId === toCourseId) return null;
-
-  const training = trainings.find((t) =>
-    t.courses.some((c) => c.id === toCourseId),
-  );
-  if (!training) return null;
-
-  let moved: Attendee | null = null;
-  const withoutAttendee = trainings.map((t) => ({
-    ...t,
-    courses: t.courses.map((c) => {
-      if (c.id !== fromCourseId) return c;
-      const found = c.attendees.find((a) => a.id === attendeeId);
-      if (found) moved = found;
-      return {
-        ...c,
-        attendees: c.attendees.filter((a) => a.id !== attendeeId),
-      };
-    }),
-  }));
-
-  if (!moved) return null;
-
-  const targetCourse = training.courses.find((c) => c.id === toCourseId);
-  if (
-    targetCourse?.attendees.some(
-      (a) => a.employeeNumber === moved!.employeeNumber,
-    )
-  ) {
-    return "duplicate";
-  }
-
-  const attendee = moved;
-  return {
-    trainings: withoutAttendee.map((t) => ({
-      ...t,
-      courses: t.courses.map((c) =>
-        c.id === toCourseId
-          ? { ...c, attendees: [...c.attendees, attendee] }
-          : c,
-      ),
-    })),
-    selection: {
-      kind: "course",
-      trainingId: training.id,
-      courseId: toCourseId,
-    },
-  };
-}
-
-export function TrainingWorkspace() {
-  const [trainings, setTrainings] = useState<Training[]>(INITIAL_TRAININGS);
-  const [selection, setSelection] = useState<TrainingSelection>({
-    kind: "course",
-    trainingId: "t3",
-    courseId: "c4",
-  });
+export function TrainingWorkspace({
+  trainings,
+  employees,
+  initialSelection,
+}: TrainingWorkspaceProps) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [selection, setSelection] =
+    useState<TrainingSelection>(initialSelection);
   const [selectedAttendeeId, setSelectedAttendeeId] = useState<string | null>(
     null,
   );
   const [referenceFileName, setReferenceFileName] = useState("employees.xlsx");
+
+  const refresh = useCallback(() => {
+    startTransition(() => {
+      router.refresh();
+    });
+  }, [router]);
 
   const selectedContext = resolveActiveCourse(trainings, selection);
 
@@ -219,198 +139,95 @@ export function TrainingWorkspace() {
     setSelectedAttendeeId(attendeeId);
   }, []);
 
-  const addParentTraining = useCallback((name: string) => {
-    const trainingId = crypto.randomUUID();
-    const courseId = crypto.randomUUID();
-    const newTraining: Training = {
-      id: trainingId,
-      name,
-      courses: [
-        {
-          id: courseId,
-          name,
-          date: "未設定",
-          location: "未設定",
-          attendees: [],
-        },
-      ],
-    };
-    setTrainings((prev) => [...prev, newTraining]);
-    setSelection({ kind: "training", trainingId });
-    setSelectedAttendeeId(null);
-  }, []);
+  const addParentTraining = useCallback(
+    async (name: string) => {
+      const { trainingId } = await createTrainingAction(name);
+      setSelection({ kind: "training", trainingId });
+      setSelectedAttendeeId(null);
+      refresh();
+    },
+    [refresh],
+  );
 
   const addChildCourse = useCallback(
-    (name: string) => {
+    async (name: string) => {
       if (selection.kind === "none") return;
 
-      const trainingId = selection.trainingId;
-      let nextSelection: TrainingSelection | null = null;
-
-      setTrainings((prev) => {
-        const result = applyAddChildCourse(prev, trainingId, name);
-        if (!result) return prev;
-        nextSelection = result.selection;
-        return result.trainings;
-      });
-
+      const nextSelection = await addChildCourseAction(
+        selection.trainingId,
+        name,
+      );
       if (nextSelection) {
         setSelection(nextSelection);
         setSelectedAttendeeId(null);
+        refresh();
       }
     },
-    [selection],
+    [selection, refresh],
   );
 
-  const deleteSelected = useCallback(() => {
+  const deleteSelected = useCallback(async () => {
     if (selection.kind === "none") return;
 
+    const deleted = selection;
+    const nextSelection = pickFallbackSelection(trainings, deleted);
+
     if (selection.kind === "training") {
-      const next = trainings.filter((t) => t.id !== selection.trainingId);
-      setTrainings(next);
-      setSelection(pickFallbackSelection(next, selection));
-      setSelectedAttendeeId(null);
-      return;
+      await deleteTrainingAction(selection.trainingId);
+    } else {
+      await deleteCourseAction(selection.courseId);
     }
 
-    const { trainingId, courseId } = selection;
-    const next = trainings
-      .map((training) => {
-        if (training.id !== trainingId) return training;
-        return {
-          ...training,
-          courses: training.courses.filter((c) => c.id !== courseId),
-        };
-      })
-      .filter((training) => training.courses.length > 0);
-
-    setTrainings(next);
-    setSelection(
-      pickFallbackSelection(next, {
-        kind: "course",
-        trainingId,
-        courseId,
-      }),
-    );
+    setSelection(nextSelection);
     setSelectedAttendeeId(null);
-  }, [selection, trainings]);
+    refresh();
+  }, [selection, trainings, refresh]);
 
   const addAttendee = useCallback(
-    (courseId: string, employeeNumber: string): AddAttendeeResult => {
-      const emp = findEmployee(employeeNumber);
-      if (!emp) return "not_found";
-
-      let result: AddAttendeeResult = "ok";
-      const newAttendee: Attendee = {
-        id: crypto.randomUUID(),
-        employeeNumber: emp.employeeNumber,
-        name: emp.name,
-        department: emp.department,
-        departmentCode: emp.departmentCode,
-      };
-
-      setTrainings((prev) => {
-        const targetCourse = prev
-          .flatMap((t) => t.courses)
-          .find((c) => c.id === courseId);
-        if (
-          targetCourse?.attendees.some(
-            (a) => a.employeeNumber === emp.employeeNumber,
-          )
-        ) {
-          result = "duplicate";
-          return prev;
-        }
-
-        return prev.map((t) => ({
-          ...t,
-          courses: t.courses.map((c) =>
-            c.id === courseId
-              ? { ...c, attendees: [...c.attendees, newAttendee] }
-              : c,
-          ),
-        }));
-      });
-
-      if (result === "ok") {
-        setSelectedAttendeeId(newAttendee.id);
+    async (courseId: string, employeeNumber: string): Promise<AddAttendeeResult> => {
+      const outcome = await addEnrollmentAction(courseId, employeeNumber);
+      if (outcome.result === "ok" && outcome.enrollmentId) {
+        setSelectedAttendeeId(outcome.enrollmentId);
+        refresh();
       }
-      return result;
+      return outcome.result;
     },
-    [],
+    [refresh],
   );
 
   const updateCourseField = useCallback(
-    (courseId: string, field: "date" | "location", value: string) => {
-      setTrainings((prev) =>
-        prev.map((t) => ({
-          ...t,
-          courses: t.courses.map((c) =>
-            c.id === courseId ? { ...c, [field]: value } : c,
-          ),
-        })),
-      );
+    async (courseId: string, field: "date" | "location", value: string) => {
+      await updateCourseFieldAction(courseId, field, value);
+      refresh();
     },
-    [],
+    [refresh],
   );
 
-  const removeAttendee = useCallback(() => {
+  const removeAttendee = useCallback(async () => {
     if (!selectedAttendeeId) return;
-
-    setTrainings((prev) => {
-      const ctx = resolveActiveCourse(prev, selection);
-      const courseId = ctx?.course.id;
-      if (!courseId) return prev;
-
-      return prev.map((t) => ({
-        ...t,
-        courses: t.courses.map((c) =>
-          c.id === courseId
-            ? {
-                ...c,
-                attendees: c.attendees.filter(
-                  (a) => a.id !== selectedAttendeeId,
-                ),
-              }
-            : c,
-        ),
-      }));
-    });
+    await removeEnrollmentAction(selectedAttendeeId);
     setSelectedAttendeeId(null);
-  }, [selectedAttendeeId, selection]);
+    refresh();
+  }, [selectedAttendeeId, refresh]);
 
   const moveAttendeeToCourse = useCallback(
-    (
+    async (
       attendeeId: string,
       fromCourseId: string,
       toCourseId: string,
-    ): MoveAttendeeResult => {
-      let outcome: MoveAttendeeResult = "failed";
-      let nextSelection: TrainingSelection | null = null;
-
-      setTrainings((prev) => {
-        const result = applyMoveAttendee(
-          prev,
-          attendeeId,
-          fromCourseId,
-          toCourseId,
-        );
-        if (result === null) return prev;
-        if (result === "duplicate") {
-          outcome = "duplicate";
-          return prev;
-        }
-        outcome = "ok";
-        nextSelection = result.selection;
-        return result.trainings;
-      });
-
-      if (nextSelection) {
-        setSelection(nextSelection);
+    ): Promise<MoveAttendeeResult> => {
+      const outcome = await moveEnrollmentAction(
+        attendeeId,
+        fromCourseId,
+        toCourseId,
+      );
+      if (outcome.result === "ok" && outcome.selection) {
+        setSelection(outcome.selection);
+        refresh();
       }
-      return outcome;
+      return outcome.result;
     },
-    [],
+    [refresh],
   );
 
   const siblingCourses = selectedContext?.training.courses ?? [];
@@ -458,6 +275,7 @@ export function TrainingWorkspace() {
               trainingName={paneTrainingName ?? ""}
               currentCourseId={activeCourseId}
               siblingCourses={siblingCourses}
+              employees={employees}
               onAdd={(code) =>
                 activeCourseId ? addAttendee(activeCourseId, code) : "not_found"
               }

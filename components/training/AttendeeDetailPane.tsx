@@ -6,9 +6,9 @@ import type {
   Attendee,
   Course,
   AddAttendeeResult,
+  Employee,
   MoveAttendeeResult,
 } from "@/lib/training-schema";
-import { findEmployee } from "@/lib/data/employee-mock";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -32,12 +32,13 @@ type AttendeeDetailPaneProps = {
   trainingName: string;
   currentCourseId: string | null;
   siblingCourses: Course[];
-  onAdd: (employeeNumber: string) => AddAttendeeResult;
-  onRemove: () => void;
+  employees: Employee[];
+  onAdd: (employeeNumber: string) => AddAttendeeResult | Promise<AddAttendeeResult>;
+  onRemove: () => void | Promise<void>;
   onMoveToCourse: (
     attendeeId: string,
     toCourseId: string,
-  ) => MoveAttendeeResult;
+  ) => MoveAttendeeResult | Promise<MoveAttendeeResult>;
 };
 
 function formatCourseLabel(
@@ -54,6 +55,7 @@ export function AttendeeDetailPane({
   trainingName,
   currentCourseId,
   siblingCourses,
+  employees,
   onAdd,
   onRemove,
   onMoveToCourse,
@@ -81,10 +83,15 @@ export function AttendeeDetailPane({
     ? formatCourseLabel(trainingName, selectedCourse, multiCourse)
     : "—";
 
+  const lookupEmployee = (code: string): Employee | null => {
+    const normalized = code.trim().toUpperCase();
+    return employees.find((e) => e.employeeNumber === normalized) ?? null;
+  };
+
   const handleSearch = () => {
     const trimmed = searchCode.trim().toUpperCase();
     if (!trimmed) return;
-    const emp = findEmployee(trimmed);
+    const emp = lookupEmployee(trimmed);
     if (!emp) {
       setSearchError(`「${trimmed}」は社員マスタに見つかりません`);
       return;
@@ -99,10 +106,10 @@ export function AttendeeDetailPane({
     });
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const code = display?.employeeNumber ?? searchCode.trim().toUpperCase();
     if (!code) return;
-    const result = onAdd(code);
+    const result = await onAdd(code);
     if (result === "not_found") {
       setSearchError(`「${code}」は社員マスタに見つかりません`);
       return;
@@ -116,9 +123,9 @@ export function AttendeeDetailPane({
     setSearchCode("");
   };
 
-  const handleChangeCourse = () => {
+  const handleChangeCourse = async () => {
     if (!attendee || !courseMoveReady) return;
-    const result = onMoveToCourse(attendee.id, targetCourseId);
+    const result = await onMoveToCourse(attendee.id, targetCourseId);
     if (result === "duplicate") {
       setSearchError("移動先コースに同じ従業員が既に登録されています");
       return;

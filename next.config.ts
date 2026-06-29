@@ -10,6 +10,7 @@ const projectRoot = path.resolve(__dirname);
 const nextConfig: NextConfig = {
   // Surge 静的公開のみ output: "export"。Vercel + DB では STATIC_EXPORT=true を付けない
   ...(process.env.STATIC_EXPORT === "true" ? { output: "export" as const } : {}),
+  serverExternalPackages: ["@prisma/client", "@neondatabase/serverless", "ws"],
   turbopack: {
     root: projectRoot,
   },
