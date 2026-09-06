@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/sync-db-env.mjs && next build",
-    "deploy:surge": "cross-env STATIC_EXPORT=true npm run build && npx surge out training-attendee-mgmt.surge.sh",
     "postinstall": "node scripts/sync-db-env.mjs && prisma generate",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:studio": "dotenv -e .env.local -- prisma studio",
@@ -48,7 +47,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.1",
-    "cross-env": "^10.1.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
